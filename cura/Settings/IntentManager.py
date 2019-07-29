@@ -411,7 +411,7 @@ class IntentManager(QObject):
         base_id = machine.definition.getId() if extruder_stack is None else extruder_stack.getId()
         new_id = base_id + "_" + new_name
         new_id = new_id.lower().replace(" ", "_")
-        new_id = self._container_registry.uniqueName(new_id)
+        new_id = cura.CuraApplication.CuraApplication.getInstance().getContainerRegistry().uniqueName(new_id)
 
         # Create a new quality_changes container for the quality.
         quality_changes = InstanceContainer(new_id)
@@ -425,8 +425,8 @@ class IntentManager(QObject):
             quality_changes.setMetaDataEntry("position", extruder_stack.getMetaDataEntry("position"))
 
         # If the machine specifies qualities should be filtered, ensure we match the current criteria.
-        machine_definition_id = cura.CuraApplication.CuraApplication.getInstance().getQualityManager().getMachineDefinitionIDForQualitySearch(machine.definition)
+        machine_definition_id = cura.Machines.QualityManager.getMachineDefinitionIDForQualitySearch(machine.definition)
         quality_changes.setDefinition(machine_definition_id)
 
-        quality_changes.setMetaDataEntry("setting_version", self._application.SettingVersion)
+        quality_changes.setMetaDataEntry("setting_version", cura.CuraApplication.CuraApplication.SettingVersion)
         return quality_changes
