@@ -1,8 +1,10 @@
 #Copyright (c) 2019 Ultimaker B.V.
 #Cura is released under the terms of the LGPLv3 or higher.
 
+from queue import Queue
+
 from PyQt5.QtCore import QObject, pyqtProperty, pyqtSignal, pyqtSlot
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, cast, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 import cura.CuraApplication
 from cura.Machines.QualityGroup import DEFAULT_INTENT_CATEGORY, QualityGroup
 from cura.Machines.QualityManager import getMachineDefinitionIDForQualitySearch
@@ -14,6 +16,7 @@ from UM.Settings.InstanceContainer import InstanceContainer
 
 if TYPE_CHECKING:
     from cura.Machines.QualityChangesGroup import QualityChangesGroup
+    from cura.Settings.GlobalStack import GlobalStack
     from UM.Settings.InstanceContainer import InstanceContainer
 
 ##  Front-end for querying which intents are available for a certain
@@ -27,7 +30,7 @@ class IntentManager(QObject):
         super().__init__()
 
         # For quality_changes lookup
-        self._machine_quality_type_to_quality_changes_dict = {}  # type: Dict[str, QualityNode]
+        self._machine_quality_type_to_quality_changes_dict = {}  # type: Dict[str, QualityNode]  # TODO: change name
 
     def initialize(self) -> None:
         application = cura.CuraApplication.CuraApplication.getInstance()
@@ -36,8 +39,42 @@ class IntentManager(QObject):
 
         registry = application.getInstance().getContainerRegistry()
 
+        # Continue initialization of the QualityManager node lookup structure.
+        # NOTE: In its initialization, QualityManager seems to account for buildplate variants. We don't do that here! (FIXME?)
+        quality_dict = application.getQualityManager()._machine_nozzle_buildplate_material_quality_type_to_quality_dict
+
+        nodes_to_check = Queue()  # type: Queue[QualityNode]
+        for node in quality_dict.values():
+            nodes_to_check.put(node)
+
+        while not nodes_to_check.empty():
+            node = nodes_to_check.get()
+            for child in node.children_map.values():  # <<-- This one needed here or not? (TODO)
+                nodes_to_check.put(child)
+            for sub in node.quality_type_map.values():
+                nodes_to_check.put(sub)
+
+            metadata = node.getMetadata()
+            if not ("definition" in metadata and "quality_type" in metadata and "material" in metadata and "variant" in metadata):
+                continue
+
+            definition_id = metadata["definition"]
+            quality_type = metadata["quality_type"]
+            material_id = metadata["material"]
+            nozzle_name = metadata["variant"]
+
+            intent_metadata_list = registry.findContainersMetadata(type = "intent", definition = definition_id, variant = nozzle_name, material = material_id, quality_type = quality_type)
+
+            for intent_metadata in intent_metadata_list:
+                if intent_metadata["id"] == "empty_intent":
+                    continue
+
+                intent_category = intent_metadata["intent_category"]
+                node.addIntentMetadata(quality_type, intent_category, intent_metadata)
+
         # Initialize the lookup tree for quality_changes profiles with following structure:
         # <machine> -> <quality_type> -> <name>
+        # TODO:  vvv  does this need to change?  vvv
         quality_changes_metadata_list = registry.findContainersMetadata(type = "quality_changes")
         for metadata in quality_changes_metadata_list:
             if metadata["id"] == "empty_quality_changes":
@@ -50,8 +87,9 @@ class IntentManager(QObject):
             if machine_definition_id not in self._machine_quality_type_to_quality_changes_dict:
                 self._machine_quality_type_to_quality_changes_dict[machine_definition_id] = QualityNode()
             machine_node = self._machine_quality_type_to_quality_changes_dict[machine_definition_id]
-            machine_node.addQualityChangesMetadata((intent_category, quality_type), metadata)
+            machine_node.addQualityChangesMetadata(quality_type, intent_category, metadata)
 
+        #application.getQualityManager().qualitiesUpdated.connect(onQualitiesUpdated)  # TODO!
         application.getQualityManager().qualitiesUpdated.emit()  ## TODO: Probably should use own signal.
 
     ##  This class is a singleton.
@@ -66,6 +104,7 @@ class IntentManager(QObject):
 
     ##  Gets the metadata dictionaries of all intent profiles for a given
     #   configuration.
+    #   NOTE: Doesn't return the metadata's for implicitly defined 'default' intents!
     #
     #   \param definition_id ID of the printer.
     #   \param nozzle_name Name of the nozzle.
@@ -104,7 +143,7 @@ class IntentManager(QObject):
             # TODO: We now do this (return a default) if the global stack is missing, but not in the code below,
             #       even though there should always be defaults. The problem then is what to do with the quality_types.
             #       Currently _also_ inconsistent with 'currentAvailableIntentCategories', which _does_ return default.
-        return self.getQualityGroups(global_stack).keys()
+        return list(self.getQualityGroups(global_stack).keys())
 
     ##  List of intent categories available in either of the extruders.
     #
@@ -138,8 +177,8 @@ class IntentManager(QObject):
         application = cura.CuraApplication.CuraApplication.getInstance()
         active_extruder_stack = application.getMachineManager().activeStack
         if active_extruder_stack is None:
-            return ""  # TODO: should this return "" or DEFAULT_INTENT_CATEGORY?
-        return active_extruder_stack.intent.getMetaDataEntry("intent_category", "")  # TODO: see above
+            return DEFAULT_INTENT_CATEGORY
+        return active_extruder_stack.intent.getMetaDataEntry("intent_category", DEFAULT_INTENT_CATEGORY)
 
     ##  Apply intent on the stacks.
     @pyqtSlot(str, str)
@@ -186,48 +225,63 @@ class IntentManager(QObject):
         # Update availability for each QualityChangesGroup:
         # A custom profile is always available as long as the quality_type it's based on is available
         quality_group_dict = application.getQualityManager().getDefaultIntentQualityGroups(machine)
-        available_quality_type_list = [qit for qit, qg in quality_group_dict.items() if qg.is_available]
+        available_quality_type_list = [qt for qt, qg in quality_group_dict.items() if qg.is_available]
 
         # Iterate over all quality_types in the machine node
         quality_changes_group_dict = dict()
-        for quality_tuple, quality_changes_node in machine_node.quality_type_map.items():
+        for quality_type, quality_changes_node in machine_node.quality_type_map.items():   # TODO: This is now only the quality-changes node if the intent is default!
             for quality_changes_name, quality_changes_group in quality_changes_node.children_map.items():
                 quality_changes_group_dict[quality_changes_name] = quality_changes_group
-                quality_changes_group.is_available = quality_tuple in available_quality_type_list
+                quality_changes_group.is_available = quality_type in available_quality_type_list
 
+        # TODO: Change this method to be more aware of the new QualityNode-structure!
         return quality_changes_group_dict
 
-    def getQualityGroups(self, machine: "GlobalStack") -> dict:
+    def getQualityGroups(self, machine: "GlobalStack") -> Dict[Tuple[str, str], QualityGroup]:
         application = cura.CuraApplication.CuraApplication.getInstance()
-
         quality_groups = application.getQualityManager().getDefaultIntentQualityGroups(machine)
-        available_quality_types = {quality_group.getQualityType() for quality_group in quality_groups.values() if quality_group.node_for_global is not None}
 
-        final_intent_ids = set()  # type: Set[str]
-        current_definition_id = machine.definition.getMetaDataEntry("id")
-        for extruder_stack in machine.extruderList:
-            nozzle_name = extruder_stack.variant.getMetaDataEntry("name")
-            material_id = extruder_stack.material.getMetaDataEntry("base_file")
-            final_intent_ids |= {metadata["id"] for metadata in self.intentMetadatas(current_definition_id, nozzle_name, material_id) if metadata["quality_type"] in available_quality_types}
+        quality_group_dict = dict()  # type: Dict[Tuple[str, str], QualityGroup]
+        for quality_type, quality_group in quality_groups.items():
+            quality_group_dict[(DEFAULT_INTENT_CATEGORY, quality_type)] = quality_group
 
-        quality_group_dict = dict()  # type: Set[Tuple[str, str], QualityGroup]
-        for intent_id in final_intent_ids:
-            intent_metadata = application.getContainerRegistry().findContainersMetadata(id=intent_id)[0]
-            quality_type = intent_metadata["quality_type"]
-            intent_category = intent_metadata["intent_category"]
-            quality_tuple = (intent_category, quality_type)
+            #intent_map = cast(QualityNode, quality_group.node_for_global).quality_type_map
+            #for key in intent_map.keys():
+            #    pass
+            # TODO: Do we ever have a truly 'global' intent? If so, this will be more complicated.
 
-            quality_group = quality_groups[quality_type]
+            quality_tuple_to_intent_nodes_per_extruder = {}  # type: Dict[Tuple[str, str], Dict[int, QualityNode]]
 
-            if intent_category != DEFAULT_INTENT_CATEGORY:
-                new_quality_group = QualityGroup(intent_metadata["name"], quality_tuple)
-                # TODO: Properly make a new QualityGroup
-                quality_group = new_quality_group
+            for extruder_id, extruder_node in quality_group.nodes_for_extruders.items():
+                extruder_quality_map = cast(QualityNode, extruder_node).quality_type_map
+                if quality_type not in extruder_quality_map:
+                    continue
 
-            quality_group_dict[quality_tuple] = quality_group
+                extruder_intent_map = extruder_quality_map[quality_type]
+                for intent_category, intent_node in extruder_intent_map.quality_type_map.items():
+                    quality_tuple = (intent_category, quality_type)
+                    if quality_tuple not in quality_tuple_to_intent_nodes_per_extruder:
+                        quality_tuple_to_intent_nodes_per_extruder[quality_tuple] = {}
+
+                    quality_tuple_to_intent_nodes_per_extruder[quality_tuple][extruder_id] = intent_node
+
+            for quality_tuple, intent_nodes_per_extruder in quality_tuple_to_intent_nodes_per_extruder.items():
+                quality_intent_group = QualityGroup("{0}_{1}".format(quality_group.name, intent_category), quality_tuple)  ## TODO: name is probably not correct!
+                quality_intent_group.node_for_global = quality_group.node_for_global
+
+                for extruder_id, original_extruder_node in quality_group.nodes_for_extruders.items():
+                    if extruder_id in intent_nodes_per_extruder:
+                        quality_intent_group.nodes_for_extruders[extruder_id] = intent_nodes_per_extruder[extruder_id]
+                        # TODO: Do we need to merge the intent metadata with the quality metadata?
+                    else:
+                        quality_intent_group.nodes_for_extruders[extruder_id] = original_extruder_node
+
+                quality_group_dict[quality_tuple] = quality_intent_group
+
+        # Update availabilities for each quality group  ## TODO: See if something like the below is nescesary.
+        # self._updateQualityGroupsAvailability(machine, quality_group_dict.values())
+
         return quality_group_dict
-
-    # TODO: Some (all)? of  these where labeled 'Methods for GUI' in QualityManager where they where copied from, probably should move [most|all] of them.
 
     #
     # Remove the given quality changes group.
@@ -293,8 +347,7 @@ class IntentManager(QObject):
         if quality_changes_group is None:
             # create global quality changes only
             new_name = registry.uniqueName(quality_changes_name)
-            new_quality_changes = self._createQualityChanges(quality_group.quality_type, new_name,
-                                                             global_stack, None)
+            new_quality_changes = self._createQualityChanges(quality_group.quality_type, new_name, global_stack, None)
             registry.addContainer(new_quality_changes)
         else:
             new_name = registry.uniqueName(quality_changes_name)
