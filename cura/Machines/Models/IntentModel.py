@@ -18,6 +18,7 @@ class IntentModel(ListModel):
     QualityTypeRole = Qt.UserRole + 2
     LayerHeightRole = Qt.UserRole + 3
     AvailableRole = Qt.UserRole + 4
+    IntentRole = Qt.UserRole + 5
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
@@ -26,6 +27,7 @@ class IntentModel(ListModel):
         self.addRoleName(self.QualityTypeRole, "quality_type")
         self.addRoleName(self.LayerHeightRole, "layer_height")
         self.addRoleName(self.AvailableRole, "available")
+        self.addRoleName(self.IntentRole, "intent_category")
 
         self._intent_category = "engineering"
 
@@ -58,14 +60,36 @@ class IntentModel(ListModel):
         if not global_stack:
             self.setItems(new_items)
             return
+
         quality_groups = intent_manager.getQualityGroups(global_stack)
 
+        layer_heights_added = []
+
         for quality_tuple, quality_group in quality_groups.items():
-            new_items.append({"name": quality_group.name,
+            # Add the intents that are of the correct category
+            if quality_tuple[0] == self._intent_category:
+                layer_height = self._fetchLayerHeight(quality_group)
+                new_items.append({"name": quality_group.name,
                               "quality_type": quality_tuple[1],
-                              "layer_height": self._fetchLayerHeight(quality_group),
-                              "available": True
+                              "layer_height": layer_height,
+                              "available": quality_group.is_available,
+                              "intent_category": self._intent_category
                               })
+                layer_heights_added.append(layer_height)
+
+        # Now that we added all intents that we found something for, ensure that we set add ticks (and layer_heights)
+        # for all groups that we don't have anything for (and set it to not available)
+        for quality_tuple, quality_group in quality_groups.items():
+            # Add the intents that are of the correct category
+            if quality_tuple[0] != self._intent_category:
+                layer_height = self._fetchLayerHeight(quality_group)
+                if layer_height not in layer_heights_added:
+                    new_items.append({"name": "Unavailable",
+                                      "quality_type": "",
+                                      "layer_height": layer_height,
+                                      "intent_category": self._intent_category,
+                                      "available": False})
+                    layer_heights_added.append(layer_height)
 
         new_items = sorted(new_items, key=lambda x: x["layer_height"])
         self.setItems(new_items)
@@ -99,3 +123,5 @@ class IntentModel(ListModel):
             layer_height = layer_height(global_stack)
 
         return float(layer_height)
+    def __repr__(self):
+        return str(self.items)
