@@ -57,7 +57,6 @@ class ContainerManager(QObject):
         self._container_registry = self._application.getContainerRegistry()  # type: CuraContainerRegistry
         self._machine_manager = self._application.getMachineManager()  # type: MachineManager
         self._material_manager = self._application.getMaterialManager()  # type: MaterialManager
-        self._quality_manager = self._application.getQualityManager()  # type: QualityManager
         self._container_name_filters = {}  # type: Dict[str, Dict[str, Any]]
 
     @pyqtSlot(str, str, result=str)

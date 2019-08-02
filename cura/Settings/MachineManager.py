@@ -121,7 +121,6 @@ class MachineManager(QObject):
 
         self._material_manager = self._application.getMaterialManager()  # type: MaterialManager
         self._variant_manager = self._application.getVariantManager()  # type: VariantManager
-        self._quality_manager = self._application.getQualityManager()  # type: QualityManager
         self._intent_manager = self._application.getIntentManager()  # type: IntentManager
 
         # When the materials lookup table gets updated, it can mean that a material has its name changed, which should

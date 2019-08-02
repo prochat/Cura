@@ -384,8 +384,7 @@ class CuraContainerRegistry(ContainerRegistry):
         # This prevents issues where importing a "draft" profile for a machine without "draft" qualities would report as
         # successfully imported but then fail to show up.
         # Intents don't need to be checked, since a default intent is always available.
-        quality_manager = cura.CuraApplication.CuraApplication.getInstance().getQualityManager()
-        quality_group_dict = quality_manager.getDefaultIntentQualityGroupsForMachineDefinition(global_stack)
+        quality_group_dict = cura.CuraApplication.CuraApplication.getInstance().getQualityManager().getDefaultIntentQualityGroupsForMachineDefinition(global_stack)
         if quality_type not in quality_group_dict:
             return catalog.i18nc("@info:status", "Could not find a quality type {0} for the current configuration.", quality_type)
 

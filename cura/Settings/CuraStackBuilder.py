@@ -28,7 +28,6 @@ class CuraStackBuilder:
         from cura.CuraApplication import CuraApplication
         application = CuraApplication.getInstance()
         variant_manager = application.getVariantManager()
-        quality_manager = application.getQualityManager()
         intent_manager = application.getIntentManager()
         registry = application.getContainerRegistry()
 
