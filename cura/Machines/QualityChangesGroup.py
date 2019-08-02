@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
 
 class QualityChangesGroup(QualityGroup):
-    def __init__(self, name: str, quality_tuple: Tuple[str, str], parent = None) -> None:
-        super().__init__(name, quality_tuple, parent)
+    def __init__(self, name: str, quality_type: str, intent_category: str, parent = None) -> None:
+        super().__init__(name, quality_type, intent_category, parent)
         self._container_registry = Application.getInstance().getContainerRegistry()
 
     def addNode(self, node: "QualityNode") -> None:

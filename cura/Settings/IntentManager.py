@@ -266,7 +266,8 @@ class IntentManager(QObject):
                     quality_tuple_to_intent_nodes_per_extruder[quality_tuple][extruder_id] = intent_node
 
             for quality_tuple, intent_nodes_per_extruder in quality_tuple_to_intent_nodes_per_extruder.items():
-                quality_intent_group = QualityGroup("{0}_{1}".format(quality_group.name, intent_category), quality_tuple)  ## TODO: name is probably not correct!
+                intent_category, quality_type = quality_tuple
+                quality_intent_group = QualityGroup("{0}_{1}".format(quality_group.name, intent_category), quality_type, intent_category)  ## TODO: name is probably not correct!
                 quality_intent_group.node_for_global = quality_group.node_for_global
 
                 for extruder_id, original_extruder_node in quality_group.nodes_for_extruders.items():

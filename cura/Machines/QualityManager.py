@@ -193,7 +193,7 @@ class QualityManager(QObject):
                     continue
 
                 for quality_type, quality_node in node.quality_type_map.items():
-                    quality_group = QualityGroup(quality_node.getMetaDataEntry("name", ""), (DEFAULT_INTENT_CATEGORY, quality_type))
+                    quality_group = QualityGroup(quality_node.getMetaDataEntry("name", ""), quality_type, DEFAULT_INTENT_CATEGORY)
                     quality_group.setGlobalNode(quality_node)
                     quality_group_dict[quality_type] = quality_group
                 break
@@ -291,7 +291,7 @@ class QualityManager(QObject):
 
                     for quality_type, quality_node in node.quality_type_map.items():
                         if quality_type not in quality_group_dict:
-                            quality_group = QualityGroup(quality_node.getMetaDataEntry("name", ""), (DEFAULT_INTENT_CATEGORY, quality_type))
+                            quality_group = QualityGroup(quality_node.getMetaDataEntry("name", ""), quality_type, DEFAULT_INTENT_CATEGORY)
                             quality_group_dict[quality_type] = quality_group
 
                         quality_group = quality_group_dict[quality_type]
@@ -325,7 +325,7 @@ class QualityManager(QObject):
         for node in nodes_to_check:
             if node and node.quality_type_map:
                 for quality_type, quality_node in node.quality_type_map.items():
-                    quality_group = QualityGroup(quality_node.getMetaDataEntry("name", ""), (DEFAULT_INTENT_CATEGORY, quality_type))
+                    quality_group = QualityGroup(quality_node.getMetaDataEntry("name", ""), quality_type, DEFAULT_INTENT_CATEGORY)
                     quality_group.setGlobalNode(quality_node)
                     quality_group_dict[quality_type] = quality_group
                 break

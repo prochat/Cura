@@ -60,11 +60,13 @@ mocked_intent_metadata = [
     {"id": "um3_aa4_pla_smooth_normal", "GUID": "abcxyz", "definition": "ultimaker3", "variant": "AA 0.4",
      "material_id": "generic_pla", "intent_category": "smooth", "quality_type": "normal"},
     {"id": "um3_aa4_pla_strong_abnorm", "GUID": "defqrs", "definition": "ultimaker3", "variant": "AA 0.4",
-     "material_id": "generic_pla", "intent_category": "strong", "quality_type": "abnorm"}]  # type:List[Dict[str, str]]
+     "material_id": "generic_pla", "intent_category": "strong", "quality_type": "abnorm"}
+]  # type:List[Dict[str, str]]
 
 mocked_qualitygroup_metadata = {
-    "normal": QualityGroup("um3_aa4_pla_normal", ("default", "normal")),
-    "abnorm": QualityGroup("um3_aa4_pla_abnorm", ("default", "abnorm"))}  # type:Dict[str, QualityGroup]
+    "normal": QualityGroup("um3_aa4_pla_normal", quality_type = "normal", intent_category = "default"),
+    "abnorm": QualityGroup("um3_aa4_pla_abnorm", quality_type = "abnorm", intent_category = "default")
+}  # type:Dict[str, QualityGroup]
 
 
 def mockFindMetadata(**kwargs) -> List[Dict[str, Any]]:

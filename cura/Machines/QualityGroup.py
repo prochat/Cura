@@ -26,12 +26,13 @@ DEFAULT_INTENT_CATEGORY = "default"
 #
 class QualityGroup(QObject):
 
-    def __init__(self, name: str, quality_tuple: Tuple[str, str], parent = None) -> None:
+    def __init__(self, name: str, quality_type: str, intent_category: str, parent = None) -> None:
         super().__init__(parent)
         self.name = name
         self.node_for_global = None  # type: Optional[ContainerNode]
         self.nodes_for_extruders = {}  # type: Dict[int, ContainerNode]
-        self.quality_tuple = quality_tuple
+        self.quality_type = quality_type
+        self.intent_category = intent_category
         self.is_available = False
         self.is_experimental = False
 
@@ -40,10 +41,10 @@ class QualityGroup(QObject):
         return self.name
 
     def getQualityType(self) -> str:
-        return self.quality_tuple[1]
+        return self.quality_type
 
     def getIntentCategory(self) -> str:
-        return self.quality_tuple[0]
+        return self.intent_category
 
     def getAllKeys(self) -> Set[str]:
         result = set()  # type: Set[str]

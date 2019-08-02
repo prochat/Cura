@@ -58,7 +58,7 @@ def test_createMachine(application, container_registry, definition_container, gl
     global_variant_node.getContainer = MagicMock(return_value = global_variant)
 
     variant_manager.getDefaultVariantNode = MagicMock(return_value = global_variant_node)
-    quality_group = QualityGroup(name = "zomg", quality_tuple = ("default", "normal"))
+    quality_group = QualityGroup(name = "zomg", quality_type = "normal", intent_category = "default")
     quality_group.node_for_global = MagicMock(name = "Node for global")
     quality_group.node_for_global.getContainer = MagicMock(return_value = quality_container)
     quality_manager.getDefaultIntentQualityGroups = MagicMock(return_value = {"normal": quality_group})
