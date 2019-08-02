@@ -388,16 +388,18 @@ class IntentManager(QObject):
         for stack in stack_list:
             user_container = stack.userChanges
             quality_container = stack.quality
+            intent_container = stack.intent
             quality_changes_container = stack.qualityChanges
-            if not quality_container or not quality_changes_container:
-                Logger.log("w", "No quality or quality changes container found in stack %s, ignoring it", stack.getId())
+            if not quality_container or not quality_changes_container or not intent_container:
+                Logger.log("w", "No quality, intent or quality changes container found in stack %s, ignoring it", stack.getId())
                 continue
 
             quality_type = quality_container.getMetaDataEntry("quality_type")
+            intent_category = intent_container.getMetaDataEntry("intent_category")
             extruder_stack = None
             if isinstance(stack, ExtruderStack):
                 extruder_stack = stack
-            new_changes = self._createQualityChanges(quality_type, unique_name, global_stack, extruder_stack)
+            new_changes = self._createQualityChanges(intent_category, quality_type, unique_name, global_stack, extruder_stack)
             from cura.Settings.ContainerManager import ContainerManager
             ContainerManager.getInstance()._performMerge(new_changes, quality_changes_container, clear_settings = False)
             ContainerManager.getInstance()._performMerge(new_changes, user_container)
@@ -407,7 +409,7 @@ class IntentManager(QObject):
     #
     # Create a quality changes container with the given setup.
     #
-    def _createQualityChanges(self, quality_tuple: Tuple[str, str], new_name: str, machine: "GlobalStack", extruder_stack: Optional["ExtruderStack"]) -> "InstanceContainer":
+    def _createQualityChanges(self, intent_category: str, quality_type: str, new_name: str, machine: "GlobalStack", extruder_stack: Optional["ExtruderStack"]) -> "InstanceContainer":
         base_id = machine.definition.getId() if extruder_stack is None else extruder_stack.getId()
         new_id = base_id + "_" + new_name
         new_id = new_id.lower().replace(" ", "_")
@@ -417,8 +419,8 @@ class IntentManager(QObject):
         quality_changes = InstanceContainer(new_id)
         quality_changes.setName(new_name)
         quality_changes.setMetaDataEntry("type", "quality_changes")
-        quality_changes.setMetaDataEntry("quality_type", quality_tuple[1])
-        quality_changes.setMetaDataEntry("intent_category", quality_tuple[0])
+        quality_changes.setMetaDataEntry("quality_type", quality_type)
+        quality_changes.setMetaDataEntry("intent_category", intent_category)
 
         # If we are creating a container for an extruder, ensure we add that to the container
         if extruder_stack is not None:
